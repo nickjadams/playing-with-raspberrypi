@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from gpio.i2c.Adafruit_I2C import Adafruit_I2C
+from playing.pi.gpio.i2c.Adafruit_I2C import Adafruit_I2C
 
 #Constants
 TC74 = 0x48			# Address of the TC74 on the I2C bus
