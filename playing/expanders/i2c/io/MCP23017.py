@@ -5,53 +5,54 @@ from playing.pi.gpio.i2c.Adafruit_I2C import Adafruit_I2C
 import time
 
 class MCP23017Bank():
-	def __init__(self,name,direction=0x00,pullups=0x00,latch=0x00):
-		self.name = name
-		self.direction = direction
-		self.pullups = pullups
-		self.latch = latch
+   def __init__(self,name,direction=0xff,pullups=0x00,polarity=0x00,latch=0x00):
+      self.name = name
+      self.direction = direction
+      self.pullups = pullups
+      self.polarity = polarity
+      self.latch = latch
 
-	def printLatchValues(self):
-		print 'Latch Value: 0x%0.2x' % self.latch
-		zero = self.latch 
-		one = self.latch
-		two = self.latch
-		three = self.latch
-		four = self.latch
-		five = self.latch
-		six = self.latch
-		seven = self.latch
+   def printLatchValues(self):
+      print 'Latch Value: 0x%0.2x' % self.latch
+      zero = self.latch 
+      one = self.latch
+      two = self.latch
+      three = self.latch
+      four = self.latch
+      five = self.latch
+      six = self.latch
+      seven = self.latch
 
-		zero = zero & (1 << 0)
-		one = one & (1 << 1)
-		two = two & (1 << 2)
-		three = three & (1 << 3)
-		four = four & (1 << 4)
-		five = five & (1 << 5)
-		six = six & (1 << 6)
-		seven = seven & (1 << 7)
+      zero = zero & (1 << 0)
+      one = one & (1 << 1)
+      two = two & (1 << 2)
+      three = three & (1 << 3)
+      four = four & (1 << 4)
+      five = five & (1 << 5)
+      six = six & (1 << 6)
+      seven = seven & (1 << 7)
 
-		a = [zero, one, two, three, four, five, six, seven]
-		for i in range(len(a)):
-			if a[i] == (1 << i):
-				isSet = True
-			else:
-				isSet = False
-			print 'GP%s%d:%s' % (self.name, i, isSet)
-
+      a = [zero, one, two, three, four, five, six, seven]
+      for i in range(len(a)):
+         if a[i] == (1 << i):
+            isSet = True
+         else:
+            isSet = False
+         print 'GP%s%d:%s' % (self.name, i, isSet)
+   
 class MCP23017():
 
    # Register Constants
-   IODIRA = 0x00		# Input or Output
-   IODIRB = 0x01		# Input or Output
-   IOPOLA = 0x02		# Invert polarity of input pins
-   IOPOLB = 0x03		# Invert polarity of input pins
-   GPPUA  = 0x0c		# Enable / disable pull-up resistors 
-   GPPUB  = 0x0d		# Enable / disable pull-up resistors 
-   GPIOA  = 0x12		# Read and write to the values in the bank
-   GPIOB  = 0x13		# Read and write to the values in the bank
-   OLATA  = 0x14		# Output latch 
-   OLATB  = 0x15		# Output latch
+   IODIRA = 0x00     # Input or Output
+   IODIRB = 0x01     # Input or Output
+   IOPOLA = 0x02     # Invert polarity of input pins
+   IOPOLB = 0x03     # Invert polarity of input pins
+   GPPUA  = 0x0c     # Enable / disable pull-up resistors 
+   GPPUB  = 0x0d     # Enable / disable pull-up resistors 
+   GPIOA  = 0x12     # Read and write to the values in the bank
+   GPIOB  = 0x13     # Read and write to the values in the bank
+   OLATA  = 0x14     # Output latch 
+   OLATB  = 0x15     # Output latch
 
 
    INPUT  = True
@@ -64,15 +65,19 @@ class MCP23017():
       # Bank A
       self.i2c.write8(self.IODIRA, self.bankA.direction)
       self.i2c.write8(self.GPPUA, self.bankA.pullups)
+      self.i2c.write8(self.IOPOLA, self.bankA.polarity)
       self.bankA.latch = self.i2c.readU8(self.OLATA)
       # Bank B
       self.i2c.write8(self.IODIRB, self.bankB.direction)
       self.i2c.write8(self.GPPUB, self.bankB.pullups)
+      self.i2c.write8(self.IOPOLB, self.bankB.polarity)
       self.bankB.latch = self.i2c.readU8(self.OLATB)
 
 
    def output(self, bank, pin, value):
       assert 0 <= pin <= 7, 'Invalid pin number'
+      if bank != 'A':
+         assert bank == 'B', 'Bank can be either A or B nothing else'
 
       if bank == 'A':
          if value:
@@ -88,80 +93,90 @@ class MCP23017():
          self.i2c.write8(self.OLATB, self.bankB.latch)
 
 
+   def input(self, bank, pin):
+      assert 0 <= pin <= 7, 'Invalid pin number'
+      assert bank in ('A', 'B'), 'Bank can be either A or B nothing else'
+
+      if bank == 'A':
+         assert (self.bankA.direction & (1 << pin)) != 0, 'Pin is not configures as input'
+         value = self.i2c.readU8(self.GPIOA)
+
+      if bank == 'B':
+         assert (self.bankB.direction & (1 << pin)) != 0, 'Pin is not configures as input'
+         value = self.i2c.readU8(self.GPIOB)
+
+      return (value >> pin) & 1
 
 
+
+
+   def config(self,bank,pin,pullup=None,direction=None,polarity=None):
+      assert 0 <= pin <= 7, 'Invalid pin number'
+      assert bank in ('A', 'B'), 'Bank can be either A or B nothing else'
+      assert pullup in (None, True, False), 'Invalid value for pullup argument, must be None, True, or False'
+      assert direction in (None, True, False), 'Invalid value for direction argument, must be None, True, or False'
+      assert polarity in (None, True, False), 'Invalid value for polarity argument, must be None, True, or False'
+
+      if pullup == None and direction == None and polarity == None:
+         return #Nothing to do as both values are not specified. 
+      
+      if bank == 'A':
+         if pullup == True:
+            self.bankA.pullups = self.bankA.pullups | (1 << pin)
+         elif pullup == False:
+            self.bankA.pullups = self.bankA.pullups & ~(1 << pin)
+         
+         if pullup in (True, False):
+            self.i2c.write8(self.GPPUA, self.bankA.pullups)
+
+         if direction == True:
+            self.bankA.direction = self.bankA.direction | (1 << pin)
+         elif direction == False:
+            self.bankA.direction = self.bankA.direction & ~(1 << pin)
+
+         if direction in (True, False):
+            self.i2c.write8(self.IODIRA, self.bankA.direction)
+
+         if polarity == True:
+            self.bankA.polarity = self.bankA.polarity | (1 << pin)
+         elif polarity == False:
+            self.bankA.polarity = self.bankA.polarity & ~(1 << pin)
+
+         if polarity in (True, False):
+            self.i2c.write8(self.IOPOLA, self.bankA.polarity)
+
+
+      if bank == 'B':
+         if pullup == True:
+            self.bankB.pullups = self.bankB.pullups | (1 << pin)
+         elif pullup == False:
+            self.bankB.pullups = self.bankB.pullups & ~(1 << pin)
+         
+         if pullup in (True, False):
+            self.i2c.write8(self.GPPUB, self.bankB.pullups)
+
+         if direction == True:
+            self.bankB.direction = self.bankB.direction | (1 << pin)
+         elif direction == False:
+            self.bankB.direction = self.bankB.direction & ~(1 << pin)
+
+         if direction in (True, False):
+            self.i2c.write8(self.IODIRB, self.bankB.direction)
+
+         if polarity == True:
+            self.bankB.polarity = self.bankB.polarity | (1 << pin)
+         elif polarity == False:
+            self.bankB.polarity = self.bankB.polarity & ~(1 << pin)
+
+         if polarity in (True, False):
+            self.i2c.write8(self.IOPOLB, self.bankB.polarity)
 
 
 if __name__=='__main__':
    mcp = MCP23017()
-   print "0x%0.2x" % mcp.bankB.direction
-   print mcp.bankA.printLatchValues()
-   print mcp.bankB.printLatchValues()
-   
-   mcp.output('A', 7, True)
-   time.sleep(1)
-   mcp.output('A',6,True)
-   time.sleep(1)
-   mcp.output('A',5,True)
-   time.sleep(1)
-   mcp.output('A',4,True)
-   time.sleep(1)
-   mcp.output('A',3,True)
-   time.sleep(1)
-   mcp.output('A',2,True)
-   time.sleep(1)
-   mcp.output('A',1,True)
-   time.sleep(1)
-   mcp.output('A',0,True)
-   time.sleep(1)
-   mcp.output('B', 0, True)
-   time.sleep(1)
-   mcp.output('B',1,True)
-   time.sleep(1)
-   mcp.output('B',2,True)
-   time.sleep(1)
-   mcp.output('B',3,True)
-   time.sleep(1)
-   mcp.output('B',4,True)
-   time.sleep(1)
-   mcp.output('B',5,True)
-   time.sleep(1)
-   mcp.output('B',6,True)
-   time.sleep(1)
-   mcp.output('B',7,True)
-   time.sleep(1)
-   mcp.output('A', 7, False)
-   time.sleep(1)
-   mcp.output('A',6,False)
-   time.sleep(1)
-   mcp.output('A',5,False)
-   time.sleep(1)
-   mcp.output('A',4,False)
-   time.sleep(1)
-   mcp.output('A',3,False)
-   time.sleep(1)
-   mcp.output('A',2,False)
-   time.sleep(1)
-   mcp.output('A',1,False)
-   time.sleep(1)
-   mcp.output('A',0,False)
-   time.sleep(1)
-   mcp.output('B', 0, False)
-   time.sleep(1)
-   mcp.output('B',1,False)
-   time.sleep(1)
-   mcp.output('B',2,False)
-   time.sleep(1)
-   mcp.output('B',3,False)
-   time.sleep(1)
-   mcp.output('B',4,False)
-   time.sleep(1)
-   mcp.output('B',5,False)
-   time.sleep(1)
-   mcp.output('B',6,False)
-   time.sleep(1)
-   mcp.output('B',7,False)
-   time.sleep(1)
+   mcp.config('A', 7, pullup=True, direction=True, polarity=True )
 
-
+   while True:
+      print mcp.input('A',7)
+      time.sleep(0.05)
 
