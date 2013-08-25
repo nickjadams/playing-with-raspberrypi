@@ -2,15 +2,16 @@
 
 from playing.pi.gpio.i2c.Adafruit_I2C import Adafruit_I2C
 
+# Used for testing only
 import time
 
 class MCP23017Bank():
-   def __init__(self,name,direction=0xff,pullups=0x00,polarity=0x00,interuptsEnabled=0x00,interruptsDefaults=0x00,interruptsType=0xff,latch=0x00):
+   def __init__(self,name,direction=0xff,pullups=0x00,polarity=0x00,interruptsEnabled=0x00,interruptsDefaults=0x00,interruptsType=0xff,latch=0x00):
       self.name = name
       self.direction = direction
       self.pullups = pullups
       self.polarity = polarity
-      self.interuptsEnabled = interuptsEnabled
+      self.interruptsEnabled = interruptsEnabled
       self.interruptsDefaults = interruptsDefaults
       self.interruptsType = interruptsType
       self.latch = latch
@@ -81,16 +82,16 @@ class MCP23017():
       self.i2c.write8(self.GPPUA, self.bankA.pullups)
       self.i2c.write8(self.IOPOLA, self.bankA.polarity)
       self.i2c.write8(self.GPINTENA, self.bankA.interruptsEnabled)
-      self.12c.write8(self.DEFVALA, self.bankA.interruptsDefaults)
-      self.i2c.write(self.INTCONA, self.bankA.interruptsType)
+      self.i2c.write8(self.DEFVALA, self.bankA.interruptsDefaults)
+      self.i2c.write8(self.INTCONA, self.bankA.interruptsType)
       self.bankA.latch = self.i2c.readU8(self.OLATA)
       # Bank B
       self.i2c.write8(self.IODIRB, self.bankB.direction)
       self.i2c.write8(self.GPPUB, self.bankB.pullups)
       self.i2c.write8(self.IOPOLB, self.bankB.polarity)
       self.i2c.write8(self.GPINTENB, self.bankB.interruptsEnabled)
-      self.12c.write8(self.DEFVALB, self.bankB.interruptsDefaults)
-      self.i2c.write(self.INTCONA, self.bankA.interruptsType)
+      self.i2c.write8(self.DEFVALB, self.bankB.interruptsDefaults)
+      self.i2c.write8(self.INTCONA, self.bankA.interruptsType)
       self.bankB.latch = self.i2c.readU8(self.OLATB)
 
 
@@ -137,7 +138,7 @@ class MCP23017():
       assert polarity in (None, True, False), 'Invalid value for polarity argument, must be None, True, or False'
 
       if pullup == None and direction == None and polarity == None:
-         return #Nothing to do as both values are not specified. 
+         return #Nothing to do as no values are not specified. 
       
       if bank == 'A':
          if pullup == True:
