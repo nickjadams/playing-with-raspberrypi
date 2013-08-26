@@ -4,6 +4,7 @@ from playing.pi.gpio.i2c.Adafruit_I2C import Adafruit_I2C
 
 # Used for testing only
 import time
+import RPi.GPIO as GPIO
 
 class MCP23017Bank():
    def __init__(self,name,direction=0xff,pullups=0x00,polarity=0x00,interruptsEnabled=0x00,interruptsDefaults=0x00,interruptsType=0xff,latch=0x00):
@@ -69,6 +70,8 @@ class MCP23017():
    OLATA    = 0x14     # Output latch 
    OLATB    = 0x15     # Output latch
 
+   MIRROR_BIT = 6      # The bit in IOCON that controls the mirroring behaviour of the interrupts
+
 
    INPUT  = True
    OUTPUT = False
@@ -77,6 +80,8 @@ class MCP23017():
       self.i2c = Adafruit_I2C(addr)
       self.bankA = MCP23017Bank('A')
       self.bankB = MCP23017Bank('B')
+      self.config = self.i2c.readU8(self.IOCON)
+
       # Bank A
       self.i2c.write8(self.IODIRA, self.bankA.direction)
       self.i2c.write8(self.GPPUA, self.bankA.pullups)
@@ -127,17 +132,30 @@ class MCP23017():
 
       return (value >> pin) & 1
 
+   def configInterruptMirroring(self, enable=True):
+      if enable: 
+         self.config = self.config | (1 << MIRROR_BIT)
+      else:
+         self.config = self.config & ~(1 << MIRROR_BIT)
+
+      self.i2c.write8(self.IOCON, self.config)
 
 
 
-   def config(self,bank,pin,pullup=None,direction=None,polarity=None):
+
+   def configPin(self,bank,pin,pullup=None,direction=None,polarity=None,interruptEnabled=None,interruptDefault=None,interruptType=None):
       assert 0 <= pin <= 7, 'Invalid pin number'
       assert bank in ('A', 'B'), 'Bank can be either A or B nothing else'
       assert pullup in (None, True, False), 'Invalid value for pullup argument, must be None, True, or False'
       assert direction in (None, True, False), 'Invalid value for direction argument, must be None, True, or False'
       assert polarity in (None, True, False), 'Invalid value for polarity argument, must be None, True, or False'
+      assert interruptEnabled in (None, True, False), 'Invalud value for interruptEnabled argument, must ne None, True, or False'
 
-      if pullup == None and direction == None and polarity == None:
+      if interruptEnabled is not None:
+         assert interruptDefault in (True, False), 'Default value for interrupt check must be provided'
+         assert interruptType in (True, False), 'Type of interrupt must be provided'
+
+      if pullup == None and direction == None and polarity == None and interruptEnabled == None:
          return #Nothing to do as no values are not specified. 
       
       if bank == 'A':
@@ -165,6 +183,25 @@ class MCP23017():
          if polarity in (True, False):
             self.i2c.write8(self.IOPOLA, self.bankA.polarity)
 
+         if interruptEnabled == True:
+            self.bankA.interruptsEnabled = self.bankA.interruptsEnabled | (1 << pin)
+         elif interruptEnabled == False:
+            self.bankA.interruptsEnabled = self.bankA.interruptsEnabled & ~(1 << pin)
+
+         if interruptDefault == True:
+            self.bankA.interruptsDefaults = self.bankA.interruptsDefaults | (1 << pin)
+         elif interruptDefault == False:
+            self.bankA.interruptsDefaults = self.bankA.interruptsDefaults & ~(1 << pin)
+
+         if interruptType == True:
+            self.bankA.interruptsType = self.bankA.interruptsType  | (1 << pin)
+         elif interruptType == False:
+            self.bankA.interruptsType = self.bankA.interruptsType & ~(1 << pin)
+
+         if interruptEnabled in (True, False):
+            self.i2c.write8(self.GPINTENA, self.bankA.interruptsEnabled)
+            self.i2c.write8(self.DEFVALA, self.bankA.interruptsDefaults)
+            self.i2c.write8(self.INTCONA, self.bankA.interruptsType)
 
       if bank == 'B':
          if pullup == True:
@@ -190,13 +227,51 @@ class MCP23017():
 
          if polarity in (True, False):
             self.i2c.write8(self.IOPOLB, self.bankB.polarity)
+            
+         if interruptEnabled == True:
+            self.bankB.interruptsEnabled = self.bankB.interruptsEnabled | (1 << pin)
+         elif interruptEnabled == False:
+            self.bankB.interruptsEnabled = self.bankB.interruptsEnabled & ~(1 << pin)
+
+         if interruptDefault == True:
+            self.bankB.interruptsDefaults = self.bankB.interruptsDefaults | (1 << pin)
+         elif interruptDefault == False:
+            self.bankB.interruptsDefaults = self.bankB.interruptsDefaults & ~(1 << pin)
+
+         if interruptType == True:
+            self.bankB.interruptsType = self.bankB.interruptsType  | (1 << pin)
+         elif interruptType == False:
+            self.bankB.interruptsType = self.bankB.interruptsType & ~(1 << pin)
+
+         if interruptEnabled in (True, False):
+            self.i2c.write8(self.GPINTENB, self.bankB.interruptsEnabled)
+            self.i2c.write8(self.DEFVALB, self.bankB.interruptsDefaults)
+            self.i2c.write8(self.INTCONB, self.bankB.interruptsType)
+
+
 
 
 if __name__=='__main__':
    mcp = MCP23017()
-   mcp.config('A', 7, pullup=True, direction=True, polarity=True )
+   mcp.configPin('A', 7, pullup=True, direction=True, polarity=True, interruptEnabled=True, interruptDefault=False, interruptType=False)
 
-   while True:
-      print mcp.input('A',7)
-      time.sleep(0.05)
+   #while True:
+   #   print mcp.input('A',7)
+   #   time.sleep(0.05)
+
+   GPIO.setmode(GPIO.BCM)
+
+   GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+   try:
+      GPIO.wait_for_edge(22, GPIO.FALLING)
+      print 'button pressed'
+
+   except KeyboardInterrupt:
+      GPIO.cleanup()
+   GPIO.cleanup()
+
+   
+
+
 
