@@ -5,6 +5,7 @@ from playing.pi.gpio.i2c.Adafruit_I2C import Adafruit_I2C
 # Used for testing only
 import time
 import RPi.GPIO as GPIO
+import wiringpi2
 
 class MCP23017Bank():
    def __init__(self,name,direction=0xff,pullups=0x00,polarity=0x00,interruptsEnabled=0x00,interruptsDefaults=0x00,interruptsType=0xff,latch=0x00):
@@ -75,6 +76,14 @@ class MCP23017():
 
    INPUT  = True
    OUTPUT = False
+   
+   def whichPinInterrupted(self):
+      print 'INTFA: 0x%0.2x' % self.i2c.readU8(self.INTFA)
+      print 'INTFB: 0x%0.2x' % self.i2c.readU8(self.INTFB)
+      print 'INTCAPA: 0x%0.2x' % self.i2c.readU8(self.INTCAPA)
+      print 'INTCAPB: 0x%0.2x' % self.i2c.readU8(self.INTCAPB)
+
+
 
    def __init__(self, addr=0x20):
       self.i2c = Adafruit_I2C(addr)
@@ -99,6 +108,8 @@ class MCP23017():
       self.i2c.write8(self.INTCONA, self.bankA.interruptsType)
       self.bankB.latch = self.i2c.readU8(self.OLATB)
 
+      # Reset the Interrupt registers
+      self.whichPinInterrupted()
 
    def output(self, bank, pin, value):
       assert 0 <= pin <= 7, 'Invalid pin number'
@@ -139,8 +150,13 @@ class MCP23017():
          self.config = self.config & ~(1 << MIRROR_BIT)
 
       self.i2c.write8(self.IOCON, self.config)
+   
 
-
+   def whichPinInterrupted(self):
+      print 'INTFA: 0x%0.2x' % self.i2c.readU8(self.INTFA)
+      print 'INTFB: 0x%0.2x' % self.i2c.readU8(self.INTFB)
+      print 'INTCAPA: 0x%0.2x' % self.i2c.readU8(self.INTCAPA)
+      print 'INTCAPB: 0x%0.2x' % self.i2c.readU8(self.INTCAPB)
 
 
    def configPin(self,bank,pin,pullup=None,direction=None,polarity=None,interruptEnabled=None,interruptDefault=None,interruptType=None):
@@ -253,25 +269,30 @@ class MCP23017():
 
 if __name__=='__main__':
    mcp = MCP23017()
-   mcp.configPin('A', 7, pullup=True, direction=True, polarity=True, interruptEnabled=True, interruptDefault=False, interruptType=False)
+   mcp.configPin('A', 6, pullup=True, direction=True, polarity=True, interruptEnabled=True, interruptDefault=False, interruptType=False)
 
    #while True:
-   #   print mcp.input('A',7)
+   #   print mcp.input('A',6)
    #   time.sleep(0.05)
 
+   
    GPIO.setmode(GPIO.BCM)
 
    GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
    try:
-      GPIO.wait_for_edge(22, GPIO.FALLING)
-      print 'button pressed'
+      while True:
+         GPIO.wait_for_edge(22, GPIO.FALLING)
+         print 'button pressed'
+         mcp.whichPinInterrupted()
 
    except KeyboardInterrupt:
       GPIO.cleanup()
    GPIO.cleanup()
 
-   
 
 
-
+   #wiringpi2.wiringPiSetupSys()
+   #wiringpi2.pinMode(22, 0)
+   #wiringpi2.pullUpDnControl(22, 2)
+   #wiringpi2.wiringPiISR(22, wiringpi2.GPIO.INT_EDGE_SETUP, mcp.whichPinInterrupted())
